@@ -9,8 +9,10 @@
 > - [X] ~~High Fidelity Prototype [__Dec 20th__]~~
 >
 > - [ ] final submission (report, prototype, vídeo presenting the prototype) ~~[__Jan  31st__]~~
->
->>[!WARNING] 5% penalty for each week in delay
+
+
+>[!WARNING]
+>5% penalty for each week in delay
 
 ## Installation
 1. Install ffmpeg and add to path to unsure its available to the application
