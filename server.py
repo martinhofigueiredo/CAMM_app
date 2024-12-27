@@ -7,7 +7,7 @@ import numpy as np
 from datetime import datetime
 from scipy.io.wavfile import write as write_wav
 import torch
-from tinyCLAP.tinyclap import CLAPBrain  # Adjusted import for submodule directory
+#from tinyCLAP.tinyclap import CLAPBrain  # Adjusted import for submodule directory
 import tomli
 
 # Load configuration from config.toml
@@ -76,13 +76,13 @@ def process_videos():
     with open(PROCESSED_VIDEOS_FILE, "w") as f:
         f.write("\n".join(processed_videos))
 
-# Initialize the CLAP model (update hparams and other dependencies as needed)
-try:
-    hparams = config["clap"]
-    clap_model = CLAPBrain(modules=hparams['modules'], opt_class=None, hparams=hparams)
-except Exception as e:
-    print(f"Error loading CLAP model: {e}")
-    clap_model = None
+# # Initialize the CLAP model (update hparams and other dependencies as needed)
+# try:
+#     hparams = config["clap"]
+#     clap_model = CLAPBrain(modules=hparams['modules'], opt_class=None, hparams=hparams)
+# except Exception as e:
+#     print(f"Error loading CLAP model: {e}")
+#     clap_model = None
 
 @app.route('/')
 def index():
@@ -150,7 +150,11 @@ def handle_audio_clip(data):
         manage_audio_clips()
 
         # Run inference with tinyCLAP
-        results = run_clap_inference(wav_file_path)
+        #results = run_clap_inference(wav_file_path)
+        
+        # Run inference with MACLAP
+        results = evaluate_msclap(wav_file_path)
+        
         emit("inference-result", {"results": results, "filename": wav_filename})
     except Exception as e:
         print(f"Error processing audio data: {e}")
@@ -171,28 +175,78 @@ def manage_audio_clips():
         except OSError as e:
             print(f"Error removing audio clip {oldest_clip}: {e}")
 
-def run_clap_inference(audio_path):
-    """Run zero-shot inference on the audio file using CLAP."""
-    if clap_model is None:
-        return {"similarity_scores": [0]}
+# def run_clap_inference(audio_path):
+#     """Run zero-shot inference on the audio file using CLAP."""
+#     if clap_model is None:
+#         return {"similarity_scores": [0]}
 
-    try:
-        # Load the audio file into a tensor
-        audio_signal = torch.tensor(np.load(audio_path))  # Replace with appropriate loader
-        audio_embed = clap_model.preprocess(audio_signal.unsqueeze(0))
+#     try:
+#         # Load the audio file into a tensor
+#         audio_signal = torch.tensor(np.load(audio_path))  # Replace with appropriate loader
+#         audio_embed = clap_model.preprocess(audio_signal.unsqueeze(0))
 
-        # Generate captions using the preamble and descriptors
-        preamble = config["clap"]["preamble"]
-        descriptors = config["clap"]["descriptors"]
-        captions = [f"{preamble} {descriptor}" for descriptor in descriptors]
+#         # Generate captions using the preamble and descriptors
+#         preamble = config["clap"]["preamble"]
+#         descriptors = config["clap"]["descriptors"]
+#         captions = [f"{preamble} {descriptor}" for descriptor in descriptors]
 
-        # Prepare text features and compute similarity
-        text_features = clap_model.prepare_txt_features(captions)
-        similarity = clap_model.compute_sim(audio_embed, text_features)
-        return {"similarity_scores": similarity.tolist(), "captions": captions}
-    except Exception as e:
-        print(f"Error during inference: {e}")
-        return {"similarity_scores": [0]}
+#         # Prepare text features and compute similarity
+#         text_features = clap_model.prepare_txt_features(captions)
+#         similarity = clap_model.compute_sim(audio_embed, text_features)
+#         return {"similarity_scores": similarity.tolist(), "captions": captions}
+#     except Exception as e:
+#         print(f"Error during inference: {e}")
+#         return {"similarity_scores": [0]}
+def evaluate_msclap(audio_file):
+    """
+    This is an example using CLAP for zero-shot inference.
+    """
+    from msclap import CLAP
+    import torch.nn.functional as F
+
+    # Define classes for zero-shot
+    # Should be in lower case and can be more than one word
+    #classes = ['coughing','sneezing','drinking sipping', 'breathing', 'brushing teeth']
+    classes = config["CLAP"]["descriptors"]
+    # Add prompt
+    prompt = config["CLAP"]["preamble"]
+    class_prompts = [prompt + x for x in classes]
+    #Load audio files
+
+    # Load and initialize CLAP
+    # Setting use_cuda = True will load the model on a GPU using CUDA
+    clap_model = CLAP(version = '2023', use_cuda=False)
+
+    # compute text embeddings from natural text
+    text_embeddings = clap_model.get_text_embeddings(class_prompts)
+
+    # compute the audio embeddings from an audio file
+    audio_embeddings = clap_model.get_audio_embeddings(audio_file, resample=True)
+
+    # compute the similarity between audio_embeddings and text_embeddings
+    similarity = clap_model.compute_similarity(audio_embeddings, text_embeddings)
+
+    similarity = F.softmax(similarity, dim=1)
+    values, indices = similarity[0].topk(config["CLAP"]["top_n_classes"])
+
+    # Print the results
+    print(f"File Name :{audio_file}")
+    print("Top predictions:\n")
+    for value, index in zip(values, indices):
+        print(f"{classes[index]:>16s}: {100 * value.item():.2f}%")
+
+    # Create a list of tuples (class, similarity score)
+    predictions = [(classes[index], value.item() * 100) for value, index in zip(values, indices)]
+    
+    # Return the predictions sorted in descending order of similarity
+    return predictions
+
+
+    
+
+
+
+
 
 @socketio.on("volume")
 def handle_volume(data):
