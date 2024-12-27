@@ -1,0 +1,6 @@
+flask
+flask-socketio
+numpy
+scipy
+torch
+-r tinyCLAP/extra_requirements.txt
