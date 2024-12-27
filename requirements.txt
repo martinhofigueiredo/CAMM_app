@@ -3,4 +3,5 @@ flask-socketio
 numpy
 scipy
 tomli
--r tinyCLAP/extra_requirements.txt
+msclap
+#-r tinyCLAP/extra_requirements.txt # tinyclap not operational
