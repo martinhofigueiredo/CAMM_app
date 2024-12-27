@@ -1,8 +1,10 @@
-from flask import Flask, render_template, send_from_directory
+from flask import Flask, render_template, send_from_directory, jsonify
 from flask_socketio import SocketIO, emit
 import os
 import tempfile
+import subprocess
 import numpy as np
+from datetime import datetime
 from scipy.io.wavfile import write as write_wav
 import torch
 from tinyCLAP.tinyclap import CLAPBrain  # Adjusted import for submodule directory
@@ -12,6 +14,53 @@ app.config['SECRET_KEY'] = 'secret!'
 socketio = SocketIO(app)
 
 VIDEO_DIRECTORY = "./videos"  # Default video directory
+AUDIO_CLIP_DIRECTORY = "./audio_clips"  # Directory to store audio clips
+PROCESSED_VIDEOS_FILE = "./videos/processed_videos.txt"  # File to track processed videos
+MAX_CLIPS = 10  # Maximum number of audio clips to retain
+
+# Ensure directories exist
+os.makedirs(VIDEO_DIRECTORY, exist_ok=True)
+os.makedirs(AUDIO_CLIP_DIRECTORY, exist_ok=True)
+
+def process_videos():
+    """Check for unprocessed MP4 files and create HLS playlists."""
+    # Load the list of processed videos
+    if os.path.exists(PROCESSED_VIDEOS_FILE):
+        with open(PROCESSED_VIDEOS_FILE, "r") as f:
+            processed_videos = set(f.read().splitlines())
+    else:
+        processed_videos = set()
+
+    for filename in os.listdir(VIDEO_DIRECTORY):
+        if filename.endswith(".mp4") and filename not in processed_videos:
+            mp4_path = os.path.join(VIDEO_DIRECTORY, filename)
+            base_name = os.path.splitext(filename)[0]
+            output_dir = os.path.join(VIDEO_DIRECTORY, base_name)
+
+            # Create output directory for HLS files
+            os.makedirs(output_dir, exist_ok=True)
+
+            # Generate HLS files using FFmpeg
+            m3u8_path = os.path.join(output_dir, f"{base_name}.m3u8")
+            command = [
+                "ffmpeg", "-i", mp4_path,
+                "-codec:V", "libx264", "-codec:a", "aac",
+                "-strict", "experimental", "-hls_time", "10",
+                "-hls_playlist_type", "vod",
+                "-hls_segment_filename", os.path.join(output_dir, f"{base_name}_%03d.ts"),
+                m3u8_path
+            ]
+
+            try:
+                subprocess.run(command, check=True)
+                print(f"Processed {filename} into HLS format.")
+                processed_videos.add(filename)
+            except subprocess.CalledProcessError as e:
+                print(f"Error processing {filename}: {e}")
+
+    # Save the updated list of processed videos
+    with open(PROCESSED_VIDEOS_FILE, "w") as f:
+        f.write("\n".join(processed_videos))
 
 # Initialize the CLAP model (update hparams and other dependencies as needed)
 hparams = {...}  # Load hparams configuration for CLAP
@@ -31,42 +80,77 @@ def serve_video(filename):
     """Serve video files from the directory."""
     return send_from_directory(VIDEO_DIRECTORY, filename)
 
-@socketio.on("request-stream")
-def handle_stream_request(data):
-    """Handle stream requests from clients."""
-    video_type = data.get("type", "dash")  # Client can specify 'dash' or 'hls'
-    video_name = data.get("name", "example.mpd")  # Default DASH manifest file
+@app.route('/audio-clips', methods=['GET'])
+def list_audio_clips():
+    """List all stored audio clips."""
+    clips = [
+        {"filename": f, "timestamp": os.path.getmtime(os.path.join(AUDIO_CLIP_DIRECTORY, f))}
+        for f in os.listdir(AUDIO_CLIP_DIRECTORY)
+        if f.endswith(".wav")
+    ]
+    return jsonify(sorted(clips, key=lambda x: x["timestamp"], reverse=True))
 
-    if video_type == "dash":
-        stream_url = f"/videos/{video_name}"
-        emit("stream-url", {"url": stream_url, "type": "dash"})
-    elif video_type == "hls":
-        hls_name = video_name.replace(".mpd", ".m3u8")  # Example conversion for HLS
-        stream_url = f"/videos/{hls_name}"
-        emit("stream-url", {"url": stream_url, "type": "hls"})
-    else:
-        emit("error", {"message": "Unsupported video type requested."})
+@app.route('/audio-clips/<path:filename>', methods=['GET'])
+def download_audio_clip(filename):
+    """Download a specific audio clip."""
+    return send_from_directory(AUDIO_CLIP_DIRECTORY, filename)
 
 @socketio.on("audio-clip")
 def handle_audio_clip(data):
     """Process incoming audio clips."""
     audio_bytes = data.get("audio")
     if not audio_bytes:
+        print("No audio data received.")
         emit("error", {"message": "No audio data received"})
         return
 
-    # Save the audio temporarily
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_audio:
-        temp_audio_path = temp_audio.name
-        audio_array = np.frombuffer(audio_bytes, dtype=np.uint8)  # Convert bytes to numpy array
-        write_wav(temp_audio_path, 16000, audio_array)  # Save as 16kHz WAV
+    print(f"Received audio data of size: {len(audio_bytes)} bytes")
 
-    # Run inference with tinyCLAP
-    results = run_clap_inference(temp_audio_path)
-    emit("inference-result", {"results": results})
+    try:
+        # Save the audio to a temporary file in WebM format
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        temp_file_path = os.path.join(AUDIO_CLIP_DIRECTORY, f"clip_{timestamp}.webm")
+        with open(temp_file_path, "wb") as temp_file:
+            temp_file.write(audio_bytes)
 
-    # Optionally, clean up the temporary file
-    os.remove(temp_audio_path)
+        print(f"Saved raw WebM audio clip to: {temp_file_path}")
+
+        # Convert WebM to WAV using FFmpeg
+        wav_filename = f"clip_{timestamp}.wav"
+        wav_file_path = os.path.join(AUDIO_CLIP_DIRECTORY, wav_filename)
+        command = [
+            "ffmpeg", "-i", temp_file_path, "-ar", "16000", "-ac", "1", wav_file_path
+        ]
+        subprocess.run(command, check=True)
+        print(f"Converted audio clip to WAV: {wav_file_path}")
+
+        # Remove the temporary WebM file
+        os.remove(temp_file_path)
+
+        # Manage audio clip count
+        manage_audio_clips()
+
+        # Run inference with tinyCLAP
+        results = run_clap_inference(wav_file_path)
+        emit("inference-result", {"results": results, "filename": wav_filename})
+    except Exception as e:
+        print(f"Error processing audio data: {e}")
+        emit("error", {"message": "Error processing audio data"})
+
+def manage_audio_clips():
+    """Ensure the number of audio clips does not exceed the maximum limit."""
+    clips = sorted(
+        (os.path.join(AUDIO_CLIP_DIRECTORY, f) for f in os.listdir(AUDIO_CLIP_DIRECTORY) if f.endswith(".wav")),
+        key=os.path.getmtime
+    )
+    
+    while len(clips) > MAX_CLIPS:
+        oldest_clip = clips.pop(0)
+        try:
+            os.remove(oldest_clip)
+            print(f"Removed old audio clip: {oldest_clip}")
+        except OSError as e:
+            print(f"Error removing audio clip {oldest_clip}: {e}")
 
 def run_clap_inference(audio_path):
     """Run zero-shot inference on the audio file using CLAP."""
@@ -95,8 +179,5 @@ def handle_volume(data):
     print(f"Microphone Volume: {data['volume']}")
 
 if __name__ == '__main__':
-    if not os.path.exists(VIDEO_DIRECTORY):
-        os.makedirs(VIDEO_DIRECTORY)
-        print(f"Video directory created at {VIDEO_DIRECTORY}. Please add your video files.")
-
+    process_videos()  # Ensure videos are processed into HLS format
     socketio.run(app, debug=True)

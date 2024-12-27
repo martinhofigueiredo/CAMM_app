@@ -3,50 +3,62 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video.js Player</title>
+    <title>Video.js Player with Audio Sampling</title>
     <!-- Include Video.js CSS and JS -->
     <link href="https://vjs.zencdn.net/7.20.3/video-js.css" rel="stylesheet">
     <script src="https://vjs.zencdn.net/7.20.3/video.min.js"></script>
+    <!-- Include Socket.IO client library -->
+    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
 </head>
 <body>
-    <h1>Video.js Player</h1>
+    <h1>Video.js Player with Audio Sampling</h1>
 
     <!-- Video.js player container -->
     <video id="videoPlayer" class="video-js vjs-default-skin" controls preload="auto" width="640" height="360">
-        <source src="" type="application/x-mpegURL">
+        <source src="videos/Big_Buck_Bunny_1080_10s_30MB/Big_Buck_Bunny_1080_10s_30MB.m3u8" type="application/x-mpegURL">
         Your browser does not support the video tag.
     </video>
 
-    <div>Microphone Volume: <span id="volume">0</span></div>
-
     <script>
         const socket = io.connect(window.location.origin);
-        const volumeDisplay = document.getElementById("volume");
 
-        // Microphone volume handling
-        async function startAudioVolumeMonitoring() {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        async function startAudioProcessing() {
+            try {
+                console.log("Requesting microphone access...");
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                console.log("Microphone access granted.");
 
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const analyser = audioContext.createAnalyser();
-            const microphone = audioContext.createMediaStreamSource(stream);
-            microphone.connect(analyser);
-            analyser.fftSize = 256;
+                // Function to record and send audio clips
+                function recordAndSendAudio() {
+                    const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+                    const chunks = [];
 
-            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+                    recorder.ondataavailable = (event) => {
+                        chunks.push(event.data);
+                    };
 
-            function updateVolume() {
-                analyser.getByteFrequencyData(dataArray);
-                const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
-                volumeDisplay.innerText = average.toFixed(2);
-                socket.emit("volume", { volume: average.toFixed(2) });
-                requestAnimationFrame(updateVolume);
+                    recorder.onstop = async () => {
+                        const blob = new Blob(chunks, { type: "audio/webm" });
+                        const arrayBuffer = await blob.arrayBuffer();
+                        console.log("Sending audio clip of size:", arrayBuffer.byteLength);
+                        socket.emit("audio-clip", { audio: arrayBuffer });
+                    };
+
+                    // Start recording for 3 seconds
+                    recorder.start();
+                    setTimeout(() => recorder.stop(), 3000);
+                }
+
+                // Record audio every 5 seconds
+                setInterval(recordAndSendAudio, 5000);
+            } catch (err) {
+                console.error("Error accessing microphone:", err);
+                alert("Microphone access is required. Please check your browser permissions.");
             }
-
-            updateVolume();
         }
 
-        startAudioVolumeMonitoring();
+        // Start audio processing
+        startAudioProcessing();
 
         // Video.js player setup
         const player = videojs('videoPlayer');
