@@ -1,0 +1,3 @@
+[submodule "tinyCLAP"]
+	path = tinyCLAP
+	url = https://github.com/martinhofigueiredo/tinyCLAP
