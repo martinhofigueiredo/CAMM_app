@@ -153,7 +153,7 @@ def handle_audio_clip(data):
         #results = run_clap_inference(wav_file_path)
         
         # Run inference with MACLAP
-        results = evaluate_msclap(wav_file_path)
+        results = evaluate_msclap([wav_file_path])
         
         emit("inference-result", {"results": results, "filename": wav_filename})
     except Exception as e:
@@ -197,7 +197,7 @@ def manage_audio_clips():
 #     except Exception as e:
 #         print(f"Error during inference: {e}")
 #         return {"similarity_scores": [0]}
-def evaluate_msclap(audio_file):
+def evaluate_msclap(audio_files):
     """
     This is an example using CLAP for zero-shot inference.
     """
@@ -207,11 +207,13 @@ def evaluate_msclap(audio_file):
     # Define classes for zero-shot
     # Should be in lower case and can be more than one word
     #classes = ['coughing','sneezing','drinking sipping', 'breathing', 'brushing teeth']
-    classes = config["CLAP"]["descriptors"]
+    classes = config["clap"]["descriptors"]
     # Add prompt
-    prompt = config["CLAP"]["preamble"]
+    #prompt = 'this is a sound of '
+    prompt = config["clap"]["preamble"]
     class_prompts = [prompt + x for x in classes]
     #Load audio files
+    #audio_files = ['/Users/mafaldadinis/Github/CAMM_app/audio_clips/test_audio.wav']
 
     # Load and initialize CLAP
     # Setting use_cuda = True will load the model on a GPU using CUDA
@@ -221,16 +223,15 @@ def evaluate_msclap(audio_file):
     text_embeddings = clap_model.get_text_embeddings(class_prompts)
 
     # compute the audio embeddings from an audio file
-    audio_embeddings = clap_model.get_audio_embeddings(audio_file, resample=True)
+    audio_embeddings = clap_model.get_audio_embeddings(audio_files, resample=True)
 
     # compute the similarity between audio_embeddings and text_embeddings
     similarity = clap_model.compute_similarity(audio_embeddings, text_embeddings)
 
     similarity = F.softmax(similarity, dim=1)
-    values, indices = similarity[0].topk(config["CLAP"]["top_n_classes"])
+    values, indices = similarity[0].topk(config["clap"]["top_n_classes"])
 
     # Print the results
-    print(f"File Name :{audio_file}")
     print("Top predictions:\n")
     for value, index in zip(values, indices):
         print(f"{classes[index]:>16s}: {100 * value.item():.2f}%")
@@ -240,12 +241,6 @@ def evaluate_msclap(audio_file):
     
     # Return the predictions sorted in descending order of similarity
     return predictions
-
-
-    
-
-
-
 
 
 @socketio.on("volume")

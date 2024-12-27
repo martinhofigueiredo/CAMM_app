@@ -35,6 +35,10 @@ descriptors = [
     "a quiet room",
     "traffic noise",
     "a dog barking",
-    "water running"
+    "water running",
+    "snore",
+    "water dripping",
+    "children laugh",
+    "birds chirping"
 ]
-top_n_classes = 3
+top_n_classes = 9

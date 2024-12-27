@@ -1,3 +1,5 @@
+import tomli
+
 def evaluate_msclap(audio_files):
     """
     This is an example using CLAP for zero-shot inference.
@@ -8,11 +10,13 @@ def evaluate_msclap(audio_files):
     # Define classes for zero-shot
     # Should be in lower case and can be more than one word
     #classes = ['coughing','sneezing','drinking sipping', 'breathing', 'brushing teeth']
+    classes = config["clap"]["descriptors"]
     # Add prompt
     #prompt = 'this is a sound of '
-    class_prompts = [config["CLAP"]["preamble"] + x for x in config["CLAP"]["descriptors"]]
+    prompt = config["clap"]["preamble"]
+    class_prompts = [prompt + x for x in classes]
     #Load audio files
-    audio_files = ['/Users/mafaldadinis/Github/CAMM_app/audio_clips/test_audio.wav']
+    #audio_files = ['/Users/mafaldadinis/Github/CAMM_app/audio_clips/test_audio.wav']
 
     # Load and initialize CLAP
     # Setting use_cuda = True will load the model on a GPU using CUDA
@@ -28,7 +32,7 @@ def evaluate_msclap(audio_files):
     similarity = clap_model.compute_similarity(audio_embeddings, text_embeddings)
 
     similarity = F.softmax(similarity, dim=1)
-    values, indices = similarity[0].topk(config["CLAP"]["top_n_classes"])
+    values, indices = similarity[0].topk(config["clap"]["top_n_classes"])
 
     # Print the results
     print("Top predictions:\n")
@@ -51,5 +55,44 @@ except Exception as e:
     exit(1)
 
 
+import os
+
+def list_wav_files(folder_path):
+    """
+    Lists the file paths of all .wav files in a folder.
+
+    Args:
+        folder_path (str): Path to the folder containing .wav files.
+
+    Returns:
+        list: A list of file paths for all .wav files.
+    """
+    wav_file_paths = []
+    
+    
+    # Iterate over all files in the folder
+    for file_name in os.listdir(folder_path):
+        # Check if the file has a .wav extension
+        if file_name.lower().endswith('.wav'):
+            file_path = os.path.join(folder_path, file_name)
+            full_path = os.path.abspath(file_path)
+            wav_file_paths.append(full_path)
+    
+    return wav_file_paths
+
 if __name__ == '__main__':
-    audio_clips
+    # Specify the folder containing .wav files
+    folder_path = config["paths"]["audio_clip_directory"]
+
+    # Get the list of .wav file paths
+    wav_files = list_wav_files(folder_path)
+
+    # Print the list of file paths
+    print("WAV file paths:")
+    for file_path in wav_files:
+        print(file_path)
+        evaluate_msclap([file_path])
+
+    # Optionally, print the total count
+    print(f"Total WAV files found: {len(wav_files)}")
+    #evaluate_msclap(wav_files)
