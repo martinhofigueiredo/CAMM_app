@@ -8,15 +8,27 @@ from datetime import datetime
 from scipy.io.wavfile import write as write_wav
 import torch
 from tinyCLAP.tinyclap import CLAPBrain  # Adjusted import for submodule directory
+import tomli
 
+# Load configuration from config.toml
+CONFIG_PATH = "config.toml"
+try:
+    with open(CONFIG_PATH, "rb") as f:
+        config = tomli.load(f)
+except Exception as e:
+    print(f"Error loading configuration file {CONFIG_PATH}: {e}")
+    exit(1)
+
+# Flask application setup
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'secret!'
+app.config['SECRET_KEY'] = config["server"]["secret_key"]
 socketio = SocketIO(app)
 
-VIDEO_DIRECTORY = "./videos"  # Default video directory
-AUDIO_CLIP_DIRECTORY = "./audio_clips"  # Directory to store audio clips
-PROCESSED_VIDEOS_FILE = "./videos/processed_videos.txt"  # File to track processed videos
-MAX_CLIPS = 10  # Maximum number of audio clips to retain
+# Directories and file paths from configuration
+VIDEO_DIRECTORY = config["paths"]["video_directory"]
+AUDIO_CLIP_DIRECTORY = config["paths"]["audio_clip_directory"]
+PROCESSED_VIDEOS_FILE = config["paths"]["processed_videos_file"]
+MAX_CLIPS = config["audio"]["max_clips"]
 
 # Ensure directories exist
 os.makedirs(VIDEO_DIRECTORY, exist_ok=True)
@@ -44,9 +56,11 @@ def process_videos():
             m3u8_path = os.path.join(output_dir, f"{base_name}.m3u8")
             command = [
                 "ffmpeg", "-i", mp4_path,
-                "-codec:V", "libx264", "-codec:a", "aac",
-                "-strict", "experimental", "-hls_time", "10",
-                "-hls_playlist_type", "vod",
+                "-codec:V", config["ffmpeg"]["video_codec"],
+                "-codec:a", config["ffmpeg"]["audio_codec"],
+                "-strict", "experimental",
+                "-hls_time", str(config["ffmpeg"]["hls_time"]),
+                "-hls_playlist_type", config["ffmpeg"]["playlist_type"],
                 "-hls_segment_filename", os.path.join(output_dir, f"{base_name}_%03d.ts"),
                 m3u8_path
             ]
@@ -63,8 +77,8 @@ def process_videos():
         f.write("\n".join(processed_videos))
 
 # Initialize the CLAP model (update hparams and other dependencies as needed)
-hparams = {...}  # Load hparams configuration for CLAP
 try:
+    hparams = config["clap"]
     clap_model = CLAPBrain(modules=hparams['modules'], opt_class=None, hparams=hparams)
 except Exception as e:
     print(f"Error loading CLAP model: {e}")
@@ -72,8 +86,10 @@ except Exception as e:
 
 @app.route('/')
 def index():
-    """Serve the main HTML page."""
-    return render_template("index.html")  # Updated HTML file name
+    """Serve the main HTML page with default values."""
+    default_duration = config["audio"]["default_duration"]
+    default_interval = config["audio"]["default_interval"]
+    return render_template("index.html", default_duration=default_duration, default_interval=default_interval)
 
 @app.route('/videos/<path:filename>')
 def serve_video(filename):
@@ -119,7 +135,10 @@ def handle_audio_clip(data):
         wav_filename = f"clip_{timestamp}.wav"
         wav_file_path = os.path.join(AUDIO_CLIP_DIRECTORY, wav_filename)
         command = [
-            "ffmpeg", "-i", temp_file_path, "-ar", "16000", "-ac", "1", wav_file_path
+            "ffmpeg", "-i", temp_file_path,
+            "-ar", str(config["ffmpeg"]["sample_rate"]),
+            "-ac", str(config["ffmpeg"]["channels"]),
+            wav_file_path
         ]
         subprocess.run(command, check=True)
         print(f"Converted audio clip to WAV: {wav_file_path}")
@@ -162,13 +181,15 @@ def run_clap_inference(audio_path):
         audio_signal = torch.tensor(np.load(audio_path))  # Replace with appropriate loader
         audio_embed = clap_model.preprocess(audio_signal.unsqueeze(0))
 
-        # Compare against predefined textual descriptions
-        text_features = clap_model.prepare_txt_features([
-            "This is the sound of applause",
-            "This is a quiet room"
-        ])
+        # Generate captions using the preamble and descriptors
+        preamble = config["clap"]["preamble"]
+        descriptors = config["clap"]["descriptors"]
+        captions = [f"{preamble} {descriptor}" for descriptor in descriptors]
+
+        # Prepare text features and compute similarity
+        text_features = clap_model.prepare_txt_features(captions)
         similarity = clap_model.compute_sim(audio_embed, text_features)
-        return {"similarity_scores": similarity.tolist()}
+        return {"similarity_scores": similarity.tolist(), "captions": captions}
     except Exception as e:
         print(f"Error during inference: {e}")
         return {"similarity_scores": [0]}
@@ -180,4 +201,4 @@ def handle_volume(data):
 
 if __name__ == '__main__':
     process_videos()  # Ensure videos are processed into HLS format
-    socketio.run(app, debug=True)
+    socketio.run(app, host=config["server"]["host"], port=config["server"]["port"], debug=config["server"]["debug"])

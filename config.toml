@@ -1,0 +1,39 @@
+# Server configuration
+[server]
+host = "127.0.0.1"                # IP address to bind the server
+port = 5000                       # Port for the server
+debug = true                      # Debug mode (true/false)
+secret_key = "your_secret_key"    # Secret key for Flask
+main_page = "index.html"          # Main HTML page to serve
+
+# Paths for directories and files
+[paths]
+video_directory = "./videos"              # Directory for video files
+audio_clip_directory = "./audio_clips"    # Directory for audio clips
+processed_videos_file = "./videos/processed_videos.txt"  # File to track processed videos
+
+# Audio processing configuration
+[audio]
+max_clips = 10                            # Maximum number of audio clips to retain
+default_duration = 10                      # Default recording duration in seconds
+default_interval = 60                     # Default interval between recordings in seconds
+
+# FFmpeg configuration
+[ffmpeg]
+video_codec = "libx264"                   # Video codec for FFmpeg
+audio_codec = "aac"                       # Audio codec for FFmpeg
+hls_time = 10                             # HLS segment duration in seconds
+playlist_type = "vod"                     # HLS playlist type
+sample_rate = 16000                       # Audio sample rate for WAV conversion
+channels = 1                              # Number of audio channels for WAV conversion
+
+# CLAP model configuration
+[clap]
+preamble = "This is the sound of"         # Preamble to prepend to each descriptor
+descriptors = [
+    "applause",                           # List of descriptors for the CLAP model
+    "a quiet room",
+    "traffic noise",
+    "a dog barking",
+    "water running"
+]

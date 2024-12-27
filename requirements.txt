@@ -2,4 +2,5 @@ flask
 flask-socketio
 numpy
 scipy
+tomli
 -r tinyCLAP/extra_requirements.txt
