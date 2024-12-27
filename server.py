@@ -24,7 +24,7 @@ except Exception as e:
 @app.route('/')
 def index():
     """Serve the main HTML page."""
-    return render_template("hls_dash_player.html")  # Updated HTML file name
+    return render_template("index.html")  # Updated HTML file name
 
 @app.route('/videos/<path:filename>')
 def serve_video(filename):
