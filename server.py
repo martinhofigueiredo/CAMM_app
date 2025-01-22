@@ -138,6 +138,7 @@ def handle_audio_clip(data):
             "ffmpeg", "-i", temp_file_path,
             "-ar", str(config["ffmpeg"]["sample_rate"]),
             "-ac", str(config["ffmpeg"]["channels"]),
+            "-filter:a", "volume=1.5",  # Adjust the volume level as needed "volume=2dB"
             wav_file_path
         ]
         subprocess.run(command, check=True)
@@ -153,7 +154,7 @@ def handle_audio_clip(data):
         #results = run_clap_inference(wav_file_path)
         
 
-        
+
         # Run inference with MACLAP
         prediction = evaluate_msclap([wav_file_path])
         print(f"Prediction: {prediction}")
