@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video.js Player with Audio Sampling</title>
+    <!-- Include Video.js CSS and JS -->
+    <link href="https://vjs.zencdn.net/7.20.3/video-js.css" rel="stylesheet">
+    <script src="https://vjs.zencdn.net/7.20.3/video.min.js"></script>
+    <!-- Include Socket.IO client library -->
+    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+    <!-- Custom CSS -->
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+
+        header {
+            background: #333;
+            color: #fff;
+            padding: 1rem 0;
+            text-align: center;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.8rem;
+        }
+
+        main {
+            padding: 1rem;
+            max-width: 800px;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .video-container {
+            margin: 1rem 0;
+            position: relative;
+            width: 100%;
+            height: 0;
+            padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
+        }
+
+        .video-js {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        .controls {
+            margin: 1rem 0;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        label {
+            font-weight: bold;
+        }
+
+        select, button {
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            background: #f9f9f9;
+            cursor: pointer;
+        }
+
+        button {
+            background: #007bff;
+            color: #fff;
+            border: none;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Silêncio que se vai cantar o fado!</h1>
+    </header>
+
+    <main>
+        <!-- Video.js player container -->
+        <div class="video-container">
+            <video id="videoPlayer" class="video-js vjs-default-skin" controls preload="auto">
+                <!-- <source src="videos/Big_Buck_Bunny_1080_10s_30MB/Big_Buck_Bunny_1080_10s_30MB.m3u8" type="application/x-mpegURL">
+                 --><source src="videos/AMALIA RODRIGUES CHEIRA A LISBOA_360p/AMALIA RODRIGUES CHEIRA A LISBOA_360p.m3u8" type="application/x-mpegURL">
+                Your browser does not support the video tag.
+            </video>
+        </div>
+
+        <!-- Dropdowns for duration and interval -->
+        <div class="controls">
+            <div>
+                <label for="recording-duration">Recording Duration (seconds): </label>
+                <select id="recording-duration">
+                    <option value="3" {{ 'selected' if default_duration == 3 else '' }}>3</option>
+                    <option value="5" {{ 'selected' if default_duration == 5 else '' }}>5</option>
+                    <option value="10" {{ 'selected' if default_duration == 10 else '' }}>10</option>
+                    <option value="15" {{ 'selected' if default_duration == 15 else '' }}>15</option>
+                </select>
+            </div>
+
+            <div>
+                <label for="recording-interval">Interval Between Recordings (seconds): </label>
+                <select id="recording-interval">
+                    <option value="15" {{ 'selected' if default_interval == 15 else '' }}>15</option>
+                    <option value="60" {{ 'selected' if default_interval == 60 else '' }}>60</option>
+                    <option value="120" {{ 'selected' if default_interval == 120 else '' }}>120</option>
+                    <option value="240" {{ 'selected' if default_interval == 240 else '' }}>240</option>
+                </select>
+            </div>
+
+            <button id="toggleRecording">Start Recording</button>
+        </div>
+    </main>
+
+    <script>
+        const socket = io.connect(window.location.origin);
+        let recordingInterval = null;
+
+        async function startAudioProcessing() {
+            try {
+                console.log("Requesting microphone access...");
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                console.log("Microphone access granted.");
+
+                // Function to record and send audio clips
+                function recordAndSendAudio(duration) {
+                    const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+                    const chunks = [];
+
+                    recorder.ondataavailable = (event) => {
+                        chunks.push(event.data);
+                    };
+
+                    recorder.onstop = async () => {
+                        const blob = new Blob(chunks, { type: "audio/webm" });
+                        const arrayBuffer = await blob.arrayBuffer();
+                        console.log("Sending audio clip of size:", arrayBuffer.byteLength);
+                        socket.emit("audio-clip", { audio: arrayBuffer });
+                    };
+
+                    // Start recording for the specified duration
+                    recorder.start();
+                    setTimeout(() => recorder.stop(), duration * 1000);
+                }
+
+                // Toggle recording on/off
+                const toggleButton = document.getElementById("toggleRecording");
+                const recordingDurationSelect = document.getElementById("recording-duration");
+                const recordingIntervalSelect = document.getElementById("recording-interval");
+
+                toggleButton.addEventListener("click", () => {
+                    const duration = parseInt(recordingDurationSelect.value, 10);
+                    const interval = parseInt(recordingIntervalSelect.value, 10);
+
+                    if (recordingInterval) {
+                        clearInterval(recordingInterval);
+                        recordingInterval = null;
+                        toggleButton.textContent = "Start Recording";
+                        console.log("Recording stopped.");
+                    } else {
+                        recordingInterval = setInterval(() => recordAndSendAudio(duration), interval * 1000);
+                        toggleButton.textContent = "Stop Recording";
+                        console.log(`Recording started with duration: ${duration}s and interval: ${interval}s`);
+                    }
+                });
+            } catch (err) {
+                console.error("Error accessing microphone:", err);
+                alert("Microphone access is required. Please check your browser permissions.");
+            }
+        }
+
+        // Start audio processing
+        startAudioProcessing();
+
+        // Video.js player setup
+        const player = videojs('videoPlayer');
+
+        // Socket event to receive stream URL
+        socket.on("stream-url", (data) => {
+            const { url, type } = data; // "url" is the video stream URL, "type" can be "dash" or "hls"
+
+            if (type === "hls") {
+                player.src({
+                    src: url,
+                    type: "application/x-mpegURL",
+                });
+            } else if (type === "dash") {
+                player.src({
+                    src: url,
+                    type: "application/dash+xml",
+                });
+            }
+
+            player.play();
+        });
+        // Add this code before the closing script tag
+        // Socket event to receive predictions
+        socket.on("prediction", (data) => {
+            console.log("Received prediction:", data);
+            
+            // Get highest probability class
+            const predictionClass = data.class;
+            const probability = data.probability;
+            // Control video based on prediction
+            if (predictionClass === "silence" && probability > 60) {
+                if (player.paused()) {
+                    console.log("Silence detected, playing video");
+                    player.play();
+                }
+            } else if (predictionClass === "low noise" && probability > 60) {
+                if (player.paused()) {
+                    console.log("noise detected, increasing the volume video");
+                    player.volume(player.volume() + 0.1);
+                }
+            } else if (predictionClass === "loud noise" && probability > 60) {
+                if (!player.paused()) {
+                    console.log("Noise detected, stoping the video");
+                    player.pause();
+                }
+            }
+        });
+
+        // Add debug info display
+        const debugInfo = document.createElement('div');
+        debugInfo.style.position = 'fixed';
+        debugInfo.style.bottom = '10px';
+        debugInfo.style.left = '10px';
+        debugInfo.style.backgroundColor = 'rgba(0,0,0,0.7)';
+        debugInfo.style.color = 'white';
+        debugInfo.style.padding = '10px';
+        document.body.appendChild(debugInfo);
+
+        socket.on("prediction", (data) => {
+            debugInfo.textContent = `Class: ${data.class}, Probability: ${data.probability.toFixed(2)}`;
+        });
+    </script>
+</body>
+</html>

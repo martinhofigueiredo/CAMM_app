@@ -41,4 +41,11 @@ descriptors = [
     "children laugh",
     "birds chirping"
 ]
-top_n_classes = 9
+# List of descriptors for the CLAP model but modified for the app
+descriptors_app = [
+    "silence",
+    "low noise",
+    "loud noise"
+]
+
+top_n_classes = 3

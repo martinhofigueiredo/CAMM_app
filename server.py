@@ -89,7 +89,7 @@ def index():
     """Serve the main HTML page with default values."""
     default_duration = config["audio"]["default_duration"]
     default_interval = config["audio"]["default_interval"]
-    return render_template("index.html", default_duration=default_duration, default_interval=default_interval)
+    return render_template("test.html", default_duration=default_duration, default_interval=default_interval)
 
 @app.route('/videos/<path:filename>')
 def serve_video(filename):
@@ -152,10 +152,17 @@ def handle_audio_clip(data):
         # Run inference with tinyCLAP
         #results = run_clap_inference(wav_file_path)
         
-        # Run inference with MACLAP
-        results = evaluate_msclap([wav_file_path])
+
         
-        emit("inference-result", {"results": results, "filename": wav_filename})
+        # Run inference with MACLAP
+        prediction = evaluate_msclap([wav_file_path])
+        print(f"Prediction: {prediction}")
+        # Emit prediction to client
+        socketio.emit("prediction", {
+            "class": prediction[0][0],  # Most likely class
+            "probability": prediction[0][1]  # Probability of the most likely class
+        })
+        emit("inference-result", {"prediction": prediction, "filename": wav_filename})
     except Exception as e:
         print(f"Error processing audio data: {e}")
         emit("error", {"message": "Error processing audio data"})
@@ -197,6 +204,7 @@ def manage_audio_clips():
 #     except Exception as e:
 #         print(f"Error during inference: {e}")
 #         return {"similarity_scores": [0]}
+
 def evaluate_msclap(audio_files):
     """
     This is an example using CLAP for zero-shot inference.
@@ -207,7 +215,7 @@ def evaluate_msclap(audio_files):
     # Define classes for zero-shot
     # Should be in lower case and can be more than one word
     #classes = ['coughing','sneezing','drinking sipping', 'breathing', 'brushing teeth']
-    classes = config["clap"]["descriptors"]
+    classes = config["clap"]["descriptors_app"]
     # Add prompt
     #prompt = 'this is a sound of '
     prompt = config["clap"]["preamble"]
@@ -232,7 +240,7 @@ def evaluate_msclap(audio_files):
     values, indices = similarity[0].topk(config["clap"]["top_n_classes"])
 
     # Print the results
-    print("Top predictions:\n")
+    print("Top predictions:")
     for value, index in zip(values, indices):
         print(f"{classes[index]:>16s}: {100 * value.item():.2f}%")
 

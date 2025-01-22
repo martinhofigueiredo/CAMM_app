@@ -1,42 +1,48 @@
 # Context Aware Multimedia application
 
->This is the list of milestones and the deadlines for submitting the deliverables corresponding to each milestone  (actual links for uploading are below):
+> This is the list of milestones and the deadlines for submitting the deliverables corresponding to each milestone  (actual links for uploading are below):
 >
-> - [x] ~~Low fidelity prototype [__Nov 15th__]~~
->
+> - [X] ~~Low fidelity prototype [__Nov 15th__]~~
 > - [X] ~~Formal functional specification using UML [__Nov 29th__]~~
->
 > - [X] ~~High Fidelity Prototype [__Dec 20th__]~~
->
 > - [ ] final submission (report, prototype, vídeo presenting the prototype) ~~[__Jan  31st__]~~
 
-
->[!WARNING]
->5% penalty for each week in delay
+> [!WARNING]
+> 5% penalty for each week in delay
 
 ## Installation
+
 1. Install ffmpeg and add to path to unsure its available to the application
+
 ```bash
 sudo apt install ffmpeg
 ```
+
 2. Create Virtual Environment and activate it
-Use python 3.11.9 or 3.12.3 for the environment
+   Use python 3.11.9 or 3.12.3 for the environment
+
 ```bash
 python -m venv .venv
+# or
+uv venv --python 3.11
 source .venv/bin/activate
 ```
+
 3. Install necessary requirements
+
 ```bash
 pip install -r requirements.txt
 ```
+
 4. Run the `server.py`
+
 ```bash
 python server.py
 ```
 
 ## Configuration
 
-The configuration file `config.toml` shows all the available parameters 
+The configuration file `config.toml` shows all the available parameters
 
 ```toml
 # Server configuration
@@ -84,4 +90,3 @@ descriptors = [
 ]
 top_n_classes = 9
 ```
-
