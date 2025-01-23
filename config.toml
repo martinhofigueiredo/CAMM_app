@@ -15,8 +15,8 @@ processed_videos_file = "./videos/processed_videos.txt"  # File to track process
 # Audio processing configuration
 [audio]
 max_clips = 10                            # Maximum number of audio clips to retain
-default_duration = 5                      # Default recording duration in seconds
-default_interval = 30                     # Default interval between recordings in seconds
+default_duration = 10                      # Default recording duration in seconds
+default_interval = 15                     # Default interval between recordings in seconds
 
 # FFmpeg configuration
 [ffmpeg]
@@ -29,23 +29,13 @@ channels = 1                              # Number of audio channels for WAV con
 
 # CLAP model configuration
 [clap]
-preamble = "This is a sound of"         # Preamble to prepend to each descriptor
-descriptors = [
-    "applause",                           # List of descriptors for the CLAP model
-    "a quiet room",
-    "traffic noise",
-    "a dog barking",
-    "water running",
-    "snore",
-    "water dripping",
-    "children laugh",
-    "birds chirping"
-]
+# Preamble to prepend to each descriptor
+preamble = "This is a sound of"         
 # List of descriptors for the CLAP model but modified for the app
-descriptors_app = [
+descriptors = [
     "silence",
-    "low noise",
-    "loud noise"
+    "a low noise",
+    "a loud noise"
 ]
 
 top_n_classes = 3
