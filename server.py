@@ -206,6 +206,16 @@ if __name__ == "__main__":
 
     process_videos()  # Ensure videos are processed into HLS format
 
+
+    @app.route('/get_videos')
+    def get_videos():
+        try:
+            with open('videos/processed_videos.txt', 'r') as file:
+                videos = file.read().splitlines()
+            return jsonify(videos)
+        except Exception as e:
+            return jsonify([])
+
     @socketio.on("volume")
     def handle_volume(data):
         """Handle volume data from client."""

@@ -109,8 +109,8 @@
             <video id="videoPlayer" class="video-js vjs-default-skin" controls preload="auto">
                 <!-- <source src="videos/Big_Buck_Bunny_1080_10s_30MB/Big_Buck_Bunny_1080_10s_30MB.m3u8" type="application/x-mpegURL">
                  -->
-                <source src="videos/AMALIA RODRIGUES CHEIRA A LISBOA/AMALIA RODRIGUES CHEIRA A LISBOA_master.m3u8"
-                    type="application/x-mpegURL">
+                <!-- <source src="videos/AMALIA RODRIGUES CHEIRA A LISBOA/AMALIA RODRIGUES CHEIRA A LISBOA_master.m3u8"
+                    type="application/x-mpegURL"> -->
                 Your browser does not support the video tag.
             </video>
         </div>
@@ -137,6 +137,13 @@
                     <option value="30" {{ 'selected' if default_interval==60 else '' }}>30</option>
                     <option value="60" {{ 'selected' if default_interval==120 else '' }}>60</option>
                     <option value="120" {{ 'selected' if default_interval==240 else '' }}>120</option>
+                </select>
+            </div>
+            <!-- Add this before the quality-selector div -->
+            <div class="video-selector">
+                <label for="video-select">Select Video:</label>
+                <select id="video-select">
+                    <!-- Video options will be added here dynamically -->
                 </select>
             </div>
             <div class="quality-selector">
@@ -218,48 +225,83 @@
 
         const qualitySelect = document.getElementById('quality-select');
 
-
-        
+        // Add this after socket connection setup
+        // Fetch available videos on page load
         // Function to fetch and parse the master playlist
-        async function fetchMasterPlaylist() {
-            const response = await fetch('videos/AMALIA RODRIGUES CHEIRA A LISBOA/AMALIA RODRIGUES CHEIRA A LISBOA_master.m3u8');
+        async function updateQualityOptions(masterPlaylistUrl) {
+            const response = await fetch(masterPlaylistUrl);
             const playlistText = await response.text();
             const lines = playlistText.split('\n');
             const qualityOptions = [];
 
+            // Clear existing options
+            qualitySelect.innerHTML = '';
+
             lines.forEach((line, index) => {
-                if (line.includes('#EXT-X-STREAM-INF')) {
-                    const resMatch = line.match(/RESOLUTION=\d+x(\d+)/);
-                    if (resMatch) {
-                        const resolution = resMatch[1] + 'p';
-                        qualityOptions.push({ resolution, url: lines[index + 1] });
-                    }
+            if (line.includes('#EXT-X-STREAM-INF')) {
+                const resMatch = line.match(/RESOLUTION=\d+x(\d+)/);
+                if (resMatch) {
+                const resolution = resMatch[1] + 'p';
+                qualityOptions.push({ resolution, url: lines[index + 1] });
                 }
+            }
             });
 
             qualityOptions.forEach(option => {
-                const opt = document.createElement('option');
-                opt.value = option.url;
-                opt.textContent = option.resolution;
-                qualitySelect.appendChild(opt);
+            const opt = document.createElement('option');
+            opt.value = option.url;
+            opt.textContent = option.resolution;
+            qualitySelect.appendChild(opt);
             });
         }
 
-        fetchMasterPlaylist();
+        // Fetch available videos on page load
+        fetch('/get_videos')
+            .then(response => response.json())
+            .then(videos => {
+            const videoSelect = document.getElementById('video-select');
+            videos.forEach(video => {
+                const option = document.createElement('option');
+                option.text = video.replace('.mp4', '');
+                option.value = video.replace('.mp4', '');
+                videoSelect.appendChild(option);
+            });
+            // Initialize quality options for first video
+            const firstVideo = videos[0].replace('.mp4', '');
+            const initialSource = `videos/${firstVideo}/${firstVideo}_master.m3u8`;
+            updateQualityOptions(initialSource);
+            });
+
+        // Handle video selection change
+        document.getElementById('video-select').addEventListener('change', function() {
+            const selectedVideo = this.value;
+            const player = videojs('videoPlayer');
+            const newSource = `videos/${selectedVideo}/${selectedVideo}_master.m3u8`;
+            player.src({
+            src: newSource,
+            type: 'application/x-mpegURL'
+            });
+            player.play();
+            
+            // Update quality options for new video
+            updateQualityOptions(newSource);
+        });
+
 
         qualitySelect.addEventListener('change', (event) => {
             const selectedQuality = event.target.value;
+            const selectedVideo = document.getElementById('video-select').value;
             const currentTime = player.currentTime();
             const isPaused = player.paused();
 
             player.src({
-                src: `videos/AMALIA RODRIGUES CHEIRA A LISBOA/${selectedQuality}`,
-                type: "application/x-mpegURL",
+            src: `videos/${selectedVideo}/${selectedQuality}`,
+            type: "application/x-mpegURL",
             });
 
             player.currentTime(currentTime);
             if (!isPaused) {
-                player.play();
+            player.play();
             }
         });
 
