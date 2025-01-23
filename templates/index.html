@@ -5,11 +5,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Silêncio que se vai cantar o fado!</title>
-    <!-- Include Video.js CSS and JS -->
-    <link href="https://vjs.zencdn.net/7.20.3/video-js.css" rel="stylesheet">
+    <!-- First load Video.js -->
+    <link href="https://vjs.zencdn.net/7.20.3/video-js.css" rel="stylesheet" />
     <script src="https://vjs.zencdn.net/7.20.3/video.min.js"></script>
+    
+
     <!-- Include Socket.IO client library -->
     <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+    
     <!-- Custom CSS -->
     <style>
         body {
@@ -88,6 +91,10 @@
         button:hover {
             background: #0056b3;
         }
+
+        .quality-selector {
+            margin: 1rem 0;
+        }
     </style>
 </head>
 
@@ -102,7 +109,7 @@
             <video id="videoPlayer" class="video-js vjs-default-skin" controls preload="auto">
                 <!-- <source src="videos/Big_Buck_Bunny_1080_10s_30MB/Big_Buck_Bunny_1080_10s_30MB.m3u8" type="application/x-mpegURL">
                  -->
-                <source src="videos/AMALIA RODRIGUES CHEIRA A LISBOA_360p/AMALIA RODRIGUES CHEIRA A LISBOA_360p.m3u8"
+                <source src="videos/AMALIA RODRIGUES CHEIRA A LISBOA/AMALIA RODRIGUES CHEIRA A LISBOA_master.m3u8"
                     type="application/x-mpegURL">
                 Your browser does not support the video tag.
             </video>
@@ -130,6 +137,12 @@
                     <option value="30" {{ 'selected' if default_interval==60 else '' }}>30</option>
                     <option value="60" {{ 'selected' if default_interval==120 else '' }}>60</option>
                     <option value="120" {{ 'selected' if default_interval==240 else '' }}>120</option>
+                </select>
+            </div>
+            <div class="quality-selector">
+                <label for="quality-select">Select Quality:</label>
+                <select id="quality-select">
+                    <!-- Quality options will be added here dynamically -->
                 </select>
             </div>
         </div>
@@ -200,9 +213,56 @@
         // Start audio processing
         startAudioProcessing();
 
-        // Video.js player setup
         const player = videojs('videoPlayer');
-        player.volume(0.5); //Start at half volume so we can increase it if needed
+        player.volume(0.5);
+
+        const qualitySelect = document.getElementById('quality-select');
+
+
+        
+        // Function to fetch and parse the master playlist
+        async function fetchMasterPlaylist() {
+            const response = await fetch('videos/AMALIA RODRIGUES CHEIRA A LISBOA/AMALIA RODRIGUES CHEIRA A LISBOA_master.m3u8');
+            const playlistText = await response.text();
+            const lines = playlistText.split('\n');
+            const qualityOptions = [];
+
+            lines.forEach((line, index) => {
+                if (line.includes('#EXT-X-STREAM-INF')) {
+                    const resMatch = line.match(/RESOLUTION=\d+x(\d+)/);
+                    if (resMatch) {
+                        const resolution = resMatch[1] + 'p';
+                        qualityOptions.push({ resolution, url: lines[index + 1] });
+                    }
+                }
+            });
+
+            qualityOptions.forEach(option => {
+                const opt = document.createElement('option');
+                opt.value = option.url;
+                opt.textContent = option.resolution;
+                qualitySelect.appendChild(opt);
+            });
+        }
+
+        fetchMasterPlaylist();
+
+        qualitySelect.addEventListener('change', (event) => {
+            const selectedQuality = event.target.value;
+            const currentTime = player.currentTime();
+            const isPaused = player.paused();
+
+            player.src({
+                src: `videos/AMALIA RODRIGUES CHEIRA A LISBOA/${selectedQuality}`,
+                type: "application/x-mpegURL",
+            });
+
+            player.currentTime(currentTime);
+            if (!isPaused) {
+                player.play();
+            }
+        });
+
         // Socket event to receive stream URL
         socket.on("stream-url", (data) => {
             const { url, type } = data; // "url" is the video stream URL, "type" can be "dash" or "hls"
@@ -221,7 +281,8 @@
 
             player.play();
         });
-        // Add this code before the closing script tag
+
+
         // Socket event to receive predictions
         socket.on("prediction", (data) => {
             console.log("Received prediction:", data);

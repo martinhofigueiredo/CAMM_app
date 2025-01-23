@@ -66,6 +66,8 @@ def process_videos():
     else:
         processed_videos = set()
 
+    qualities = config["ffmpeg"]["qualities"]
+
     for filename in os.listdir(VIDEO_DIRECTORY):
         if filename.endswith(".mp4") and filename not in processed_videos:
             mp4_path = os.path.join(VIDEO_DIRECTORY, filename)
@@ -75,33 +77,41 @@ def process_videos():
             # Create output directory for HLS files
             os.makedirs(output_dir, exist_ok=True)
 
-            # Generate HLS files using FFmpeg
-            m3u8_path = os.path.join(output_dir, f"{base_name}.m3u8")
-            command = [
-                "ffmpeg",
-                "-i",
-                mp4_path,
-                "-codec:V",
-                config["ffmpeg"]["video_codec"],
-                "-codec:a",
-                config["ffmpeg"]["audio_codec"],
-                "-strict",
-                "experimental",
-                "-hls_time",
-                str(config["ffmpeg"]["hls_time"]),
-                "-hls_playlist_type",
-                config["ffmpeg"]["playlist_type"],
-                "-hls_segment_filename",
-                os.path.join(output_dir, f"{base_name}_%03d.ts"),
-                m3u8_path,
-            ]
+            master_playlist_path = os.path.join(output_dir, f"{base_name}_master.m3u8")
+            variant_playlists = []
 
-            try:
+            for q in qualities:
+                scaled_m3u8_path = os.path.join(output_dir, f"{base_name}_{q}.m3u8")
+                command = [
+                    "ffmpeg",
+                    "-i",
+                    mp4_path,
+                    "-vf",
+                    f"scale=-2:{q}",
+                    "-codec:V",
+                    config["ffmpeg"]["video_codec"],
+                    "-codec:a",
+                    config["ffmpeg"]["audio_codec"],
+                    "-strict",
+                    "experimental",
+                    "-hls_time",
+                    str(config["ffmpeg"]["hls_time"]),
+                    "-hls_playlist_type",
+                    config["ffmpeg"]["playlist_type"],
+                    "-hls_segment_filename",
+                    os.path.join(output_dir, f"{base_name}_{q}_%03d.ts"),
+                    scaled_m3u8_path,
+                ]
                 subprocess.run(command, check=True)
-                print(f"Processed {filename} into HLS format.")
-                processed_videos.add(filename)
-            except subprocess.CalledProcessError as e:
-                print(f"Error processing {filename}: {e}")
+                variant_playlists.append((scaled_m3u8_path, q))
+
+            with open(master_playlist_path, "w") as master:
+                master.write("#EXTM3U\n#EXT-X-VERSION:3\n")
+                for playlist, q in variant_playlists:
+                    master.write(f'#EXT-X-STREAM-INF:BANDWIDTH={q*1000},RESOLUTION=1280x{q}\n')
+                    master.write(f'{os.path.basename(playlist)}\n')
+
+            processed_videos.add(filename)
 
     # Save the updated list of processed videos
     with open(PROCESSED_VIDEOS_FILE, "w") as f:

@@ -26,7 +26,7 @@ hls_time = 10                             # HLS segment duration in seconds
 playlist_type = "vod"                     # HLS playlist type
 sample_rate = 16000                       # Audio sample rate for WAV conversion
 channels = 1                              # Number of audio channels for WAV conversion
-
+qualities = [240, 360, 480, 720, 1080]    # Video qualities for HLS
 # CLAP model configuration
 [clap]
 # Preamble to prepend to each descriptor
