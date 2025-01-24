@@ -26,16 +26,18 @@ hls_time = 10                             # HLS segment duration in seconds
 playlist_type = "vod"                     # HLS playlist type
 sample_rate = 16000                       # Audio sample rate for WAV conversion
 channels = 1                              # Number of audio channels for WAV conversion
-qualities = [240, 360, 480, 720, 1080]    # Video qualities for HLS
+# the videos we processed maxed out at 360p so no use for higher qualities
+qualities = [240, 360]#, 480, 720, 1080]    # Video qualities for HLS can be more but the 
+
 # CLAP model configuration
 [clap]
 # Preamble to prepend to each descriptor
 preamble = "This is a sound of"         
 # List of descriptors for the CLAP model but modified for the app
 descriptors = [
-    "silence",
-    "a low noise",
-    "a loud noise"
+    "total silence",
+    "people talking",
+    "a lot of noise"
 ]
 
 top_n_classes = 3

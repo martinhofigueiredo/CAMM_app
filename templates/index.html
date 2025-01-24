@@ -4,7 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Silêncio que se vai cantar o fado!</title>
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+
+    <title>Silêncio, que se vai cantar o fado!</title>
     <!-- First load Video.js -->
     <link href="https://vjs.zencdn.net/7.20.3/video-js.css" rel="stylesheet" />
     <script src="https://vjs.zencdn.net/7.20.3/video.min.js"></script>
@@ -25,7 +27,7 @@
         }
 
         header {
-            background: #333;
+            background: #cb5050;
             color: #fff;
             padding: 1rem 0;
             text-align: center;
@@ -100,7 +102,7 @@
 
 <body>
     <header>
-        <h1>Silêncio que se vai cantar o fado!</h1>
+        <h1>Silêncio, que se vai cantar o fado!</h1>
     </header>
 
     <main>
@@ -334,20 +336,21 @@
             const probability = data.probability;
             // Control video based on prediction
             if(isAutomatic){
-                if (predictionClass === "silence" && probability > 60) {
+                console.log("Automatic mode is on");
+                if (predictionClass === "total silence" && probability > 50) {
                     if (player.paused()) {
                         console.log("Silence detected, playing video");
                         player.play();
                     }
-                } else if (predictionClass === "low noise" && probability > 60) {
-                    if (player.paused()) {
-                        console.log("Noise detected, increasing the volume video");
-                        player.volume(player.volume() + 0.1);
-                    }
-                } else if (predictionClass === "loud noise" && probability > 60) {
+                } else if (predictionClass === "people talking" && probability > 50) {
                     if (!player.paused()) {
                         console.log("Noise detected, stoping the video");
                         player.pause();
+                    }
+                } else if (predictionClass === "a lot of noise" && probability > 50) {
+                    console.log("Noise detected, increasing the volume video");
+                    if (player.paused()) {
+                        player.volume(player.volume() + 0.1);
                     }
                 }
             }

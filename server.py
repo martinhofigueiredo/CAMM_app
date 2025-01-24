@@ -206,6 +206,14 @@ if __name__ == "__main__":
 
     process_videos()  # Ensure videos are processed into HLS format
 
+    @app.route('/favicon.ico')
+    def favicon():
+        return send_from_directory(
+            os.path.join(app.root_path, 'static'),
+            'favicon.ico', 
+            mimetype='image/vnd.microsoft.icon'
+        )
+
 
     @app.route('/get_videos')
     def get_videos():
@@ -226,6 +234,7 @@ if __name__ == "__main__":
         """Serve the main HTML page with default values."""
         default_duration = config["audio"]["default_duration"]
         default_interval = config["audio"]["default_interval"]
+
         return render_template(
             config["server"]["main_page"],
             default_duration=default_duration,
