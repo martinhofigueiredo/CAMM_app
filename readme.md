@@ -23,7 +23,7 @@ sudo apt install ffmpeg
 
 ```bash
 python -m venv .venv
-# or
+# or use UV package manager
 uv venv --python 3.11
 source .venv/bin/activate
 ```
@@ -31,13 +31,15 @@ source .venv/bin/activate
 3. Install necessary requirements
 
 ```bash
-pip install -r requirements.txt
+uv pip install -r requirements.txt
 ```
 
 4. Run the `server.py`
 
 ```bash
 python server.py
+# or
+./server.py
 ```
 
 ## Configuration
