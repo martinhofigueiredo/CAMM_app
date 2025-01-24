@@ -8,41 +8,6 @@ from datetime import datetime
 from scipy.io.wavfile import write as write_wav
 import torch
 
-""" 
-# from tinyCLAP.tinyclap import CLAPBrain  # Adjusted import for submodule directory
-Initialize the CLAP model (update hparams and other dependencies as needed)
-try:
-    hparams = config["clap"]
-    clap_model = CLAPBrain(modules=hparams['modules'], opt_class=None, hparams=hparams)
-except Exception as e:
-    print(f"Error loading CLAP model: {e}")
-    clap_model = None
-
-def run_clap_inference(audio_path):
-    #Run zero-shot inference on the audio file using CLAP.
-    if clap_model is None:
-        return {"similarity_scores": [0]}
-
-    try:
-        # Load the audio file into a tensor
-        audio_signal = torch.tensor(np.load(audio_path))  # Replace with appropriate loader
-        audio_embed = clap_model.preprocess(audio_signal.unsqueeze(0))
-
-        # Generate captions using the preamble and descriptors
-        preamble = config["clap"]["preamble"]
-        descriptors = config["clap"]["descriptors"]
-        captions = [f"{preamble} {descriptor}" for descriptor in descriptors]
-
-        # Prepare text features and compute similarity
-        text_features = clap_model.prepare_txt_features(captions)
-        similarity = clap_model.compute_sim(audio_embed, text_features)
-        return {"similarity_scores": similarity.tolist(), "captions": captions}
-    except Exception as e:
-        print(f"Error during inference: {e}")
-        return {"similarity_scores": [0]} 
-"""
-
-
 def load_config():
     import tomli
 
