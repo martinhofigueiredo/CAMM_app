@@ -327,35 +327,6 @@
         });
 
 
-        // Socket event to receive predictions
-        socket.on("prediction", (data) => {
-            console.log("Received prediction:", data);
-
-            // Get highest probability class
-            const predictionClass = data.class;
-            const probability = data.probability;
-            // Control video based on prediction
-            if(isAutomatic){
-                console.log("Automatic mode is on");
-                if (predictionClass === "total silence" && probability > 50) {
-                    if (player.paused()) {
-                        console.log("Silence detected, playing video");
-                        player.play();
-                    }
-                } else if (predictionClass === "people talking" && probability > 50) {
-                    if (!player.paused()) {
-                        console.log("Noise detected, stoping the video");
-                        player.pause();
-                    }
-                } else if (predictionClass === "a lot of noise" && probability > 50) {
-                    console.log("Noise detected, increasing the volume video");
-                    if (player.paused()) {
-                        player.volume(player.volume() + 0.1);
-                    }
-                }
-            }
-        });
-
         // Add debug info display
         const debugInfo = document.createElement('div');
         debugInfo.style.position = 'fixed';
@@ -367,9 +338,66 @@
         document.body.appendChild(debugInfo);
 
         socket.on("prediction", (data) => {
-            debugInfo.textContent = `Class: ${data.class}, Probability: ${data.probability.toFixed(2)}`;
-        });
-    </script>
+            console.log("Received prediction:", data);
+            const predictionClass = data.class;
+            const probability = data.probability;
+
+            if(isAutomatic && probability > 50) {
+            console.log("Automatic mode is on");
+            
+            const qualitySelect = document.getElementById('quality-select');
+            const videoSelect = document.getElementById('video-select');
+            const selectedVideo = videoSelect.value;
+            const currentTime = player.currentTime();
+            const isPaused = player.paused();
+
+            if (predictionClass === "total silence") {
+                // In silence, use highest quality
+                if (player.paused()) {
+                console.log("Silence detected, playing video");
+                player.play();
+                }
+                // Select highest quality option
+                qualitySelect.selectedIndex = qualitySelect.options.length - 1;
+                const highQualityUrl = qualitySelect.value;
+                player.src({
+                src: `videos/${selectedVideo}/${highQualityUrl}`,
+                type: "application/x-mpegURL",
+                });
+
+            } else if (predictionClass === "people talking") {
+                console.log("People Talking, reducing quality and increasing volume");
+                // Select lowest quality option
+                qualitySelect.selectedIndex = 0;
+                const lowQualityUrl = qualitySelect.value;
+                player.src({
+                src: `videos/${selectedVideo}/${lowQualityUrl}`,
+                type: "application/x-mpegURL",
+                });
+                // Increase volume
+                const newVolume = Math.min(player.volume() + 0.1, 1.0);
+                player.volume(newVolume);
+                
+            } else if (predictionClass === "a lot of noise") {
+                if (!player.paused()) {
+                    console.log("A lot of noise not viable, pausing video");
+                    player.pause();
+                }
+            }
+
+            // Restore playback position
+            player.currentTime(currentTime);
+            if (!isPaused) {
+                player.play();
+            }
+            }
+
+            // Update debug display with quality info
+            const qualitySelect = document.getElementById('quality-select');
+            const currentQuality = qualitySelect.options[qualitySelect.selectedIndex].text;
+            debugInfo.textContent = `Class: ${data.class}, Probability: ${data.probability.toFixed(2)}, Quality: ${currentQuality}`;
+        });    
+        </script>
 </body>
 
 </html>
