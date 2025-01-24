@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from flask import Flask, render_template, send_from_directory, jsonify
 from flask_socketio import SocketIO, emit
 import os

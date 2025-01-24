@@ -31,6 +31,7 @@ qualities = [240, 360]#, 480, 720, 1080]    # Video qualities for HLS can be mor
 
 # CLAP model configuration
 [clap]
+top_n_classes = 3
 # Preamble to prepend to each descriptor
 preamble = "This is a sound of"         
 # List of descriptors for the CLAP model but modified for the app
@@ -39,5 +40,3 @@ descriptors = [
     "people talking",
     "a lot of noise"
 ]
-
-top_n_classes = 3
